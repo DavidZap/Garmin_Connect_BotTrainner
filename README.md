@@ -354,6 +354,12 @@ Para ejecutar el refresh diario completo:
 python .\scripts\daily_refresh.py --days 7 --source node
 ```
 
+Para levantar la API local:
+
+```powershell
+python .\scripts\run_api.py
+```
+
 ## 12. Proximos Pasos Priorizados
 
 1. Conectar Garmin real o export oficial.
