@@ -336,6 +336,12 @@ python .\scripts\backfill_node_data.py
 python .\scripts\run_dashboard.py
 ```
 
+Para exportar un resumen semanal narrativo:
+
+```powershell
+python .\scripts\export_weekly_report.py
+```
+
 ## 12. Proximos Pasos Priorizados
 
 1. Conectar Garmin real o export oficial.

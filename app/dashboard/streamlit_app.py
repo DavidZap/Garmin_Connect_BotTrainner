@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 from app.analytics import AnalyticsService, CoverageAnalyticsService, PerformanceAnalyticsService
-from app.insights import InsightService
+from app.insights import InsightService, NarrativeInsightService
 
 
 st.set_page_config(page_title="Garmin Insights", layout="wide")
@@ -80,11 +80,12 @@ METRIC_GLOSSARY = {
 
 
 @st.cache_data
-def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, str, str]:
     analytics = AnalyticsService()
     coverage = CoverageAnalyticsService(analytics.db)
     performance = PerformanceAnalyticsService(analytics.db, analytics)
     insights = InsightService(analytics=analytics)
+    narrative = NarrativeInsightService(analytics.db, performance)
     dataset = analytics.build_dashboard_dataset()
     insight_frame = analytics.db.read_sql("SELECT * FROM insights_history ORDER BY insight_date DESC")
     if insight_frame.empty:
@@ -103,6 +104,10 @@ def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str
         worst_days,
         weekly_comparison,
         fatigue_alerts,
+        narrative.build_weekly_narrative(),
+        narrative.build_best_day_narrative(),
+        narrative.build_worst_day_narrative(),
+        narrative.build_alerts_narrative(),
     )
 
 
@@ -196,6 +201,10 @@ def main() -> None:
         worst_days,
         weekly_comparison,
         fatigue_alerts,
+        weekly_narrative,
+        best_day_narrative,
+        worst_day_narrative,
+        alerts_narrative,
     ) = load_dashboard_data()
     if dataset.empty:
         st.warning("No hay datos. Ejecuta primero los scripts de inicializacion e ingesta.")
@@ -305,6 +314,7 @@ def main() -> None:
     with tabs[4]:
         st.subheader("Rendimiento y comparativos")
         st.write("Interpretacion: esta vista prioriza comparaciones accionables. Muestra que mejoro o empeoro esta semana y cuales fueron tus dias fisiologicamente mas fuertes o mas comprometidos.")
+        st.info(weekly_narrative)
         if not weekly_comparison.empty:
             st.write("Comparacion semana reciente vs semana previa")
             st.dataframe(weekly_comparison, use_container_width=True)
@@ -312,18 +322,21 @@ def main() -> None:
         col_best, col_worst = st.columns(2)
         with col_best:
             st.write("Mejores dias recientes")
+            st.caption(best_day_narrative)
             if best_days.empty:
                 st.info("No hay datos suficientes para ranking de mejores dias.")
             else:
                 st.dataframe(best_days, use_container_width=True)
         with col_worst:
             st.write("Dias con peor recuperacion potencial")
+            st.caption(worst_day_narrative)
             if worst_days.empty:
                 st.info("No hay datos suficientes para ranking de peores dias.")
             else:
                 st.dataframe(worst_days, use_container_width=True)
 
         st.write("Alertas compuestas de fatiga")
+        st.caption(alerts_narrative)
         if fatigue_alerts.empty:
             st.info("No hay alertas compuestas de fatiga en el periodo seleccionado.")
         else:
