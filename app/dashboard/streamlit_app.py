@@ -4,7 +4,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.analytics import AnalyticsService, CoverageAnalyticsService, PerformanceAnalyticsService
+from app.analytics import AnalyticsService, CoverageAnalyticsService, ManualCheckinAnalyticsService, PerformanceAnalyticsService
+from app.storage import DatabaseManager
 from app.insights import InsightService, NarrativeInsightService
 
 
@@ -80,10 +81,11 @@ METRIC_GLOSSARY = {
 
 
 @st.cache_data
-def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, str, str]:
+def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, str, str]:
     analytics = AnalyticsService()
     coverage = CoverageAnalyticsService(analytics.db)
     performance = PerformanceAnalyticsService(analytics.db, analytics)
+    manual = ManualCheckinAnalyticsService(analytics.db)
     insights = InsightService(analytics=analytics)
     narrative = NarrativeInsightService(analytics.db, performance)
     dataset = analytics.build_dashboard_dataset()
@@ -91,6 +93,7 @@ def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str
     if insight_frame.empty:
         insight_frame = insights.generate_insights()
     coverage_frame = coverage.build_coverage_report()
+    manual_checkins = manual.load_checkins()
     best_days, worst_days = performance.build_day_rankings()
     weekly_comparison = performance.build_weekly_comparison()
     fatigue_alerts = performance.build_fatigue_alerts()
@@ -98,6 +101,7 @@ def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str
         dataset,
         insight_frame,
         coverage_frame,
+        manual_checkins,
         insights.build_daily_summary_text(),
         insights.build_weekly_summary_text(),
         best_days,
@@ -195,6 +199,7 @@ def main() -> None:
         dataset,
         insight_frame,
         coverage_frame,
+        manual_checkins,
         daily_summary_text,
         weekly_summary_text,
         best_days,
@@ -251,6 +256,7 @@ def main() -> None:
             "Entrenamiento y carga",
             "Tendencias",
             "Rendimiento y comparativos",
+            "Check-ins manuales",
             "Glosario y semantica",
             "Peso y composicion corporal",
             "Cobertura de datos",
@@ -348,9 +354,64 @@ def main() -> None:
             st.dataframe(fatigue_view, use_container_width=True)
 
     with tabs[5]:
-        render_glossary(coverage_frame)
+        st.subheader("Check-ins manuales")
+        st.write("Registra contexto subjetivo para enriquecer la interpretacion mas alla de los sensores.")
+
+        with st.form("manual_checkin_form", clear_on_submit=False):
+            default_date = filtered["metric_date"].max().date()
+            checkin_date = st.date_input("Fecha del check-in", value=default_date)
+            col1, col2, col3 = st.columns(3)
+            energy = col1.slider("Energia percibida", 1, 5, 3)
+            stress = col2.slider("Estres laboral", 1, 5, 3)
+            soreness = col3.slider("Dolor muscular", 1, 5, 3)
+            col4, col5, col6 = st.columns(3)
+            hydration = col4.slider("Hidratacion", 1, 5, 3)
+            nutrition = col5.slider("Calidad de alimentacion", 1, 5, 3)
+            mood = col6.slider("Estado emocional", 1, 5, 3)
+            strength_load = st.slider("Carga de fuerza/gimnasio", 0, 5, 0)
+            cycle_phase = st.text_input("Fase del ciclo menstrual (opcional)")
+            notes = st.text_area("Notas")
+            submitted = st.form_submit_button("Guardar check-in")
+
+            if submitted:
+                frame = pd.DataFrame(
+                    [
+                        {
+                            "checkin_date": pd.to_datetime(checkin_date).strftime("%Y-%m-%d"),
+                            "perceived_energy": energy,
+                            "work_stress": stress,
+                            "muscle_soreness": soreness,
+                            "hydration": hydration,
+                            "nutrition_quality": nutrition,
+                            "mood": mood,
+                            "strength_training_load": strength_load,
+                            "menstrual_cycle_phase": cycle_phase or None,
+                            "notes": notes or None,
+                            "source": "manual_dashboard",
+                        }
+                    ]
+                )
+                DatabaseManager().upsert_dataframe("manual_checkins", frame, ["checkin_date"])
+                st.cache_data.clear()
+                st.success("Check-in guardado. Recarga la pagina si no ves el cambio de inmediato.")
+
+        if manual_checkins.empty:
+            st.info("Aun no hay check-ins manuales registrados.")
+        else:
+            st.dataframe(manual_checkins.sort_values("checkin_date", ascending=False), use_container_width=True)
+            st.plotly_chart(
+                px.line(
+                    manual_checkins.sort_values("checkin_date"),
+                    x="checkin_date",
+                    y=["perceived_energy", "work_stress", "muscle_soreness", "hydration", "mood"],
+                ),
+                use_container_width=True,
+            )
 
     with tabs[6]:
+        render_glossary(coverage_frame)
+
+    with tabs[7]:
         st.subheader("Peso y composicion corporal")
         st.write("Interpretacion: esta vista solo tiene sentido si realmente existe peso o composicion corporal en tu cuenta.")
         if is_metric_available(coverage_frame, "weight_body_composition"):
@@ -359,7 +420,7 @@ def main() -> None:
         else:
             st.info("No hay datos reales de peso o composicion corporal disponibles actualmente.")
 
-    with tabs[7]:
+    with tabs[8]:
         st.subheader("Cobertura y calidad")
         st.write("Interpretacion: esta vista te dice con que datos reales contamos hoy, que tan completos estan y que falta para enriquecer el analisis.")
         if coverage_frame.empty:
@@ -384,7 +445,7 @@ def main() -> None:
                 use_container_width=True,
             )
 
-    with tabs[8]:
+    with tabs[9]:
         st.subheader("Insights automaticos")
         st.write("Cada insight incluye nombre, severidad, explicacion y recomendacion breve.")
         if insight_frame.empty:

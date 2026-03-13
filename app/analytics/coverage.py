@@ -15,6 +15,7 @@ DATASET_CONFIG = {
     "training_status": {"date_column": "measurement_date", "critical_columns": ["training_status"]},
     "activities": {"date_column": "activity_date", "critical_columns": ["activity_id", "training_load"]},
     "weight_body_composition": {"date_column": "measurement_date", "critical_columns": ["weight_kg"]},
+    "manual_checkins": {"date_column": "checkin_date", "critical_columns": ["perceived_energy", "work_stress", "muscle_soreness"]},
 }
 
 

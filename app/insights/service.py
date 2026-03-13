@@ -5,7 +5,7 @@ import uuid
 
 import pandas as pd
 
-from app.analytics import AnalyticsService, CoverageAnalyticsService, PerformanceAnalyticsService
+from app.analytics import AnalyticsService, CoverageAnalyticsService, ManualCheckinAnalyticsService, PerformanceAnalyticsService
 from app.insights.rules import INSIGHT_RULES
 from app.storage import DatabaseManager
 from app.utils import get_logger
@@ -130,6 +130,7 @@ class InsightService:
             return "No hay datos suficientes para generar un resumen diario."
         latest = dataset.sort_values("metric_date").iloc[-1]
         coverage_summary = CoverageAnalyticsService(self.db).build_availability_summary()
+        manual_summary = ManualCheckinAnalyticsService(self.db).build_context_summary()
         readiness_text = (
             f"readiness {latest.get('readiness_score', 0):.0f}, "
             if "readiness_score" in dataset.columns and dataset["readiness_score"].fillna(0).sum() > 0
@@ -139,7 +140,7 @@ class InsightService:
             f"Resumen diario {latest['metric_date'].date()}: "
             f"sueno {latest.get('duration_hours', 0):.1f}h, HRV {latest.get('overnight_avg', 0):.1f}, "
             f"RHR {latest.get('resting_hr_bpm', 0):.1f}, {readiness_text}"
-            f"carga {latest.get('total_training_load', 0):.0f}. {coverage_summary}"
+            f"carga {latest.get('total_training_load', 0):.0f}. {coverage_summary} {manual_summary}"
         )
 
     def build_weekly_summary_text(self) -> str:
@@ -151,6 +152,7 @@ class InsightService:
         if previous.empty:
             previous = recent
         coverage_summary = CoverageAnalyticsService(self.db).build_availability_summary()
+        manual_summary = ManualCheckinAnalyticsService(self.db).build_context_summary()
         readiness_clause = ""
         if "readiness_score" in dataset.columns and dataset["readiness_score"].fillna(0).sum() > 0:
             readiness_clause = (
@@ -160,7 +162,7 @@ class InsightService:
             f"Semana reciente: sueno promedio {recent['duration_hours'].mean():.1f}h vs {previous['duration_hours'].mean():.1f}h; "
             f"HRV {recent['overnight_avg'].mean():.1f} vs {previous['overnight_avg'].mean():.1f}; "
             f"RHR {recent['resting_hr_bpm'].mean():.1f} vs {previous['resting_hr_bpm'].mean():.1f};"
-            f"{readiness_clause} carga total {recent['total_training_load'].sum():.0f}. {coverage_summary}"
+            f"{readiness_clause} carga total {recent['total_training_load'].sum():.0f}. {coverage_summary} {manual_summary}"
         )
 
     def build_phase4_context(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:

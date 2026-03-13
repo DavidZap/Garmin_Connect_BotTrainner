@@ -342,6 +342,12 @@ Para exportar un resumen semanal narrativo:
 python .\scripts\export_weekly_report.py
 ```
 
+Para registrar un check-in manual desde terminal:
+
+```powershell
+python .\scripts\add_manual_checkin.py --energy 4 --stress 2 --soreness 3 --hydration 4 --nutrition 4 --mood 4 --notes "Me senti bien"
+```
+
 ## 12. Proximos Pasos Priorizados
 
 1. Conectar Garmin real o export oficial.

@@ -165,6 +165,23 @@ SCHEMA_SQL = [
     );
     """,
     """
+    CREATE TABLE IF NOT EXISTS manual_checkins (
+        checkin_date TEXT PRIMARY KEY,
+        perceived_energy INTEGER,
+        work_stress INTEGER,
+        muscle_soreness INTEGER,
+        hydration INTEGER,
+        nutrition_quality INTEGER,
+        mood INTEGER,
+        strength_training_load INTEGER,
+        menstrual_cycle_phase TEXT,
+        notes TEXT,
+        source TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS insights_history (
         insight_id TEXT PRIMARY KEY,
         insight_date TEXT,
@@ -178,4 +195,3 @@ SCHEMA_SQL = [
     );
     """,
 ]
-

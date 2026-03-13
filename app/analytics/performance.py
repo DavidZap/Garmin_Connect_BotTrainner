@@ -84,6 +84,12 @@ class PerformanceAnalyticsService:
                 conditions.append("Carga subiendo rapido")
             if row.get("duration_hours", 0) < 6.5:
                 conditions.append("Sueno corto")
+            if row.get("perceived_energy", 0) and row.get("perceived_energy", 0) <= 2:
+                conditions.append("Energia percibida baja")
+            if row.get("work_stress", 0) and row.get("work_stress", 0) >= 4:
+                conditions.append("Estres laboral alto")
+            if row.get("muscle_soreness", 0) and row.get("muscle_soreness", 0) >= 4:
+                conditions.append("Dolor muscular alto")
 
             if len(conditions) >= 2:
                 alerts.append(

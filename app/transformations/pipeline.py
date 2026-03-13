@@ -13,6 +13,7 @@ DATE_COLUMNS = {
     "training_status": "measurement_date",
     "activities": "activity_date",
     "weight_body_composition": "measurement_date",
+    "manual_checkins": "checkin_date",
 }
 
 OPTIONAL_AUDIT_COLUMNS = {
@@ -26,6 +27,7 @@ OPTIONAL_AUDIT_COLUMNS = {
     "activities": {"source", "raw_payload_path"},
     "activity_details": set(),
     "weight_body_composition": {"source", "raw_payload_path"},
+    "manual_checkins": {"source"},
 }
 
 
@@ -76,6 +78,7 @@ def build_daily_analytics_frame(frames: dict[str, pd.DataFrame]) -> pd.DataFrame
         ("training_readiness", "measurement_date"),
         ("training_status", "measurement_date"),
         ("weight_body_composition", "measurement_date"),
+        ("manual_checkins", "checkin_date"),
     ]
 
     for table_name, date_column in joins:

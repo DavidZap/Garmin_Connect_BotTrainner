@@ -22,6 +22,13 @@ DEFAULT_DAILY_COLUMNS = {
     "body_fat_pct": 0.0,
     "muscle_mass_kg": 0.0,
     "body_water_pct": 0.0,
+    "perceived_energy": 0.0,
+    "work_stress": 0.0,
+    "muscle_soreness": 0.0,
+    "hydration": 0.0,
+    "nutrition_quality": 0.0,
+    "mood": 0.0,
+    "strength_training_load": 0.0,
 }
 
 
@@ -40,6 +47,7 @@ class AnalyticsService:
             "training_status",
             "activities",
             "weight_body_composition",
+            "manual_checkins",
         ]
         return {table: self.db.read_sql(f"SELECT * FROM {table}") for table in tables}
 
