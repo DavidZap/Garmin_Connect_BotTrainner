@@ -38,6 +38,12 @@ body {
   padding: 12px 0 24px;
 }
 
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
@@ -204,6 +210,10 @@ textarea {
 }
 
 @media (min-width: 800px) {
+  .hero-actions {
+    align-items: flex-end;
+  }
+
   .metric-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }

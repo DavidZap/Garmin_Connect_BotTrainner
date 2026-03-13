@@ -14,6 +14,11 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class RefreshRequest(BaseModel):
+    days: int = 7
+    source: str = "node"
+
+
 class ManualCheckinRequest(BaseModel):
     checkin_date: str
     perceived_energy: int | None = None

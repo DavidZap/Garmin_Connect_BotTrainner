@@ -1,4 +1,6 @@
 const installButton = document.getElementById("install-button");
+const refreshButton = document.getElementById("refresh-button");
+const refreshStatus = document.getElementById("refresh-status");
 const topMetrics = document.getElementById("top-metrics");
 const weeklyNarrative = document.getElementById("weekly-narrative");
 const bestDayNarrative = document.getElementById("best-day-narrative");
@@ -101,6 +103,21 @@ async function loadDashboard() {
     weeklyNarrative.textContent = `No se pudo cargar la PWA: ${error.message}`;
   }
 }
+
+refreshButton?.addEventListener("click", async () => {
+  refreshStatus.textContent = "Actualizando datos...";
+  try {
+    const result = await fetchJson("/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: 7, source: "node" }),
+    });
+    refreshStatus.textContent = result.message;
+    await loadDashboard();
+  } catch (error) {
+    refreshStatus.textContent = `No se pudo actualizar: ${error.message}`;
+  }
+});
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -33,6 +33,8 @@ python .\scripts\run_api.py
 - Render o Railway
 - PostgreSQL administrado
 - secretos como variables de entorno
+- cron diario para `daily_refresh.py`
+- boton `Actualizar datos` en la PWA llamando `POST /refresh`
 
 ### Etapa 2
 
@@ -51,7 +53,13 @@ Recomendacion:
 3. En cloud, usar secretos del proveedor
 4. En futuro, sustituir password por tokens o sesion reutilizable cuando sea posible
 
+## Flujo recomendado hoy
+
+- despliegas API + PWA
+- configuras `GARMIN_USERNAME` y `GARMIN_PASSWORD` como secretos del servicio
+- el cron diario refresca datos
+- la PWA puede disparar `POST /refresh` con un boton unico
+
 ## Nota importante
 
 Si tus credenciales Garmin llegaron a quedar visibles en archivos versionados o compartidos, cambialas cuanto antes.
-

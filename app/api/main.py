@@ -9,7 +9,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.analytics import AnalyticsService, CoverageAnalyticsService, ManualCheckinAnalyticsService, PerformanceAnalyticsService
-from app.api.schemas import HealthResponse, ManualCheckinRequest, MessageResponse, TableResponse
+from app.api.schemas import HealthResponse, ManualCheckinRequest, MessageResponse, RefreshRequest, TableResponse
+from app.ingestion import IngestionService
 from app.insights import InsightService, NarrativeInsightService
 from app.storage import DatabaseManager
 
@@ -156,6 +157,30 @@ def create_manual_checkin(payload: ManualCheckinRequest) -> MessageResponse:
     )
     db.upsert_dataframe("manual_checkins", frame, ["checkin_date"])
     return MessageResponse(message=f"Manual check-in saved for {payload.checkin_date}")
+
+
+@app.post("/refresh", response_model=MessageResponse)
+def refresh_data(payload: RefreshRequest) -> MessageResponse:
+    ingestion = IngestionService()
+    ingestion.settings.garmin_source = payload.source
+    ingestion.client = ingestion._build_client()
+
+    counts = ingestion.ingest_last_days(payload.days)
+    analytics = AnalyticsService(ingestion.db)
+    derived = analytics.persist_derived_metrics()
+    insights = InsightService(ingestion.db, analytics).persist_insights()
+    report = NarrativeInsightService(ingestion.db).build_weekly_markdown_report()
+    exports_path = ingestion.settings.exports_path
+    exports_path.mkdir(parents=True, exist_ok=True)
+    report_path = exports_path / "weekly_report_latest.md"
+    report_path.write_text(report, encoding="utf-8")
+
+    return MessageResponse(
+        message=(
+            f"Refresh completed. Ingested={counts}, derived={len(derived)}, "
+            f"insights={len(insights)}, report={report_path.name}"
+        )
+    )
 
 
 @app.get("/meta/summary", response_model=TableResponse)

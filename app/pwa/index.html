@@ -19,7 +19,10 @@
             Vista movil instalable para revisar recuperacion, carga, mejores dias, alertas y check-ins manuales.
           </p>
         </div>
-        <button id="install-button" class="secondary-button hidden">Instalar app</button>
+        <div class="hero-actions">
+          <button id="refresh-button" class="primary-button">Actualizar datos</button>
+          <button id="install-button" class="secondary-button hidden">Instalar app</button>
+        </div>
       </header>
 
       <main class="content">
@@ -28,6 +31,7 @@
             <h2>Hoy</h2>
             <p>Resumen rapido con las senales principales disponibles.</p>
           </div>
+          <p id="refresh-status" class="form-status"></p>
           <div id="top-metrics" class="metric-grid"></div>
         </section>
 

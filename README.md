@@ -366,6 +366,8 @@ La API sirve tambien una PWA movil instalable en:
 http://127.0.0.1:8000/
 ```
 
+La PWA incluye un boton `Actualizar datos` que llama a la API para correr el refresh del pipeline.
+
 Para exponerla en tu red local y probarla desde Android:
 
 ```dotenv
@@ -382,6 +384,13 @@ Recomendacion actual:
 - usar secretos del proveedor cuando despliegues
 - no pedir usuario y password en cada apertura de la app
 - a futuro, usar onboarding una sola vez y guardar el secreto en backend, no en la PWA
+
+## Despliegue sugerido
+
+- API + PWA en Render o Railway
+- PostgreSQL administrado
+- `GARMIN_USERNAME` y `GARMIN_PASSWORD` como secretos del servicio
+- cron diario para `daily_refresh.py`
 
 ## 12. Proximos Pasos Priorizados
 
