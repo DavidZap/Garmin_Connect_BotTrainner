@@ -5,7 +5,7 @@ import uuid
 
 import pandas as pd
 
-from app.analytics import AnalyticsService, CoverageAnalyticsService
+from app.analytics import AnalyticsService, CoverageAnalyticsService, PerformanceAnalyticsService
 from app.insights.rules import INSIGHT_RULES
 from app.storage import DatabaseManager
 from app.utils import get_logger
@@ -27,6 +27,7 @@ class InsightService:
 
         dataset = dataset.sort_values("metric_date").copy()
         insights: list[dict[str, str]] = []
+        readiness_available = self._has_real_readiness(dataset)
 
         for _, row in dataset.iterrows():
             if row.get("overnight_avg", 0) and (
@@ -75,7 +76,7 @@ class InsightService:
                     )
                 )
 
-            if row.get("readiness_score", 0) < 45 and row.get("fatigue_streak", 0) >= 3:
+            if readiness_available and row.get("readiness_score", 0) < 45 and row.get("fatigue_streak", 0) >= 3:
                 insights.append(
                     self._build_insight(
                         row,
@@ -97,18 +98,19 @@ class InsightService:
                     )
                 )
 
-            balanced_week = (
-                row.get("readiness_score", 0) >= 60
-                and 0.8 <= row.get("acute_chronic_ratio", 0) <= 1.2
-                and row.get("duration_hours", 0) >= row.get("sleep_hours_7d", 0)
-            )
+            balanced_week = 0.8 <= row.get("acute_chronic_ratio", 0) <= 1.2 and row.get("duration_hours", 0) >= row.get("sleep_hours_7d", 0)
+            if readiness_available:
+                balanced_week = balanced_week and row.get("readiness_score", 0) >= 60
             if balanced_week:
+                explanation = INSIGHT_RULES[5].explanation_template
+                if not readiness_available:
+                    explanation = "La combinacion de carga, sueno y recuperacion basal luce equilibrada en esta ventana."
                 insights.append(
                     self._build_insight(
                         row,
                         "balanced_load_recovery_week",
                         "positive",
-                        INSIGHT_RULES[5].explanation_template,
+                        explanation,
                         INSIGHT_RULES[5].recommendation,
                     )
                 )
@@ -128,10 +130,15 @@ class InsightService:
             return "No hay datos suficientes para generar un resumen diario."
         latest = dataset.sort_values("metric_date").iloc[-1]
         coverage_summary = CoverageAnalyticsService(self.db).build_availability_summary()
+        readiness_text = (
+            f"readiness {latest.get('readiness_score', 0):.0f}, "
+            if "readiness_score" in dataset.columns and dataset["readiness_score"].fillna(0).sum() > 0
+            else ""
+        )
         return (
             f"Resumen diario {latest['metric_date'].date()}: "
             f"sueno {latest.get('duration_hours', 0):.1f}h, HRV {latest.get('overnight_avg', 0):.1f}, "
-            f"RHR {latest.get('resting_hr_bpm', 0):.1f}, readiness {latest.get('readiness_score', 0):.0f}, "
+            f"RHR {latest.get('resting_hr_bpm', 0):.1f}, {readiness_text}"
             f"carga {latest.get('total_training_load', 0):.0f}. {coverage_summary}"
         )
 
@@ -144,12 +151,21 @@ class InsightService:
         if previous.empty:
             previous = recent
         coverage_summary = CoverageAnalyticsService(self.db).build_availability_summary()
+        readiness_clause = ""
+        if "readiness_score" in dataset.columns and dataset["readiness_score"].fillna(0).sum() > 0:
+            readiness_clause = (
+                f" readiness {recent['readiness_score'].mean():.1f} vs {previous['readiness_score'].mean():.1f};"
+            )
         return (
             f"Semana reciente: sueno promedio {recent['duration_hours'].mean():.1f}h vs {previous['duration_hours'].mean():.1f}h; "
             f"HRV {recent['overnight_avg'].mean():.1f} vs {previous['overnight_avg'].mean():.1f}; "
-            f"readiness {recent['readiness_score'].mean():.1f} vs {previous['readiness_score'].mean():.1f}; "
-            f"carga total {recent['total_training_load'].sum():.0f}. {coverage_summary}"
+            f"RHR {recent['resting_hr_bpm'].mean():.1f} vs {previous['resting_hr_bpm'].mean():.1f};"
+            f"{readiness_clause} carga total {recent['total_training_load'].sum():.0f}. {coverage_summary}"
         )
+
+    def build_phase4_context(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        performance = PerformanceAnalyticsService(self.db, self.analytics)
+        return performance.build_day_rankings()[0], performance.build_day_rankings()[1], performance.build_weekly_comparison()
 
     def _build_insight(
         self,
@@ -181,3 +197,7 @@ class InsightService:
         if hasattr(value, "isoformat"):
             return value.isoformat()
         return value
+
+    @staticmethod
+    def _has_real_readiness(dataset: pd.DataFrame) -> bool:
+        return "readiness_score" in dataset.columns and dataset["readiness_score"].fillna(0).sum() > 0

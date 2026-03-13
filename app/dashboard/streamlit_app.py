@@ -4,35 +4,116 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.analytics import AnalyticsService, CoverageAnalyticsService
+from app.analytics import AnalyticsService, CoverageAnalyticsService, PerformanceAnalyticsService
 from app.insights import InsightService
 
 
 st.set_page_config(page_title="Garmin Insights", layout="wide")
 
+METRIC_GLOSSARY = {
+    "duration_hours": {
+        "label": "Horas de sueno",
+        "definition": "Tiempo total de sueno registrado durante la noche.",
+        "type": "Garmin real",
+    },
+    "sleep_score": {
+        "label": "Sleep score",
+        "definition": "Puntaje de calidad de sueno generado por Garmin si el dispositivo lo soporta.",
+        "type": "Garmin real",
+    },
+    "overnight_avg": {
+        "label": "HRV nocturna",
+        "definition": "Promedio nocturno de variabilidad de frecuencia cardiaca. Se interpreta contra tu propia linea base.",
+        "type": "Garmin real",
+    },
+    "baseline_low": {
+        "label": "HRV baseline low",
+        "definition": "Limite inferior de tu banda base reciente de HRV.",
+        "type": "Garmin real",
+    },
+    "baseline_high": {
+        "label": "HRV baseline high",
+        "definition": "Limite superior de tu banda base reciente de HRV.",
+        "type": "Garmin real",
+    },
+    "hrv_status": {
+        "label": "HRV status",
+        "definition": "Etiqueta Garmin para resumir si tu HRV reciente esta dentro o fuera de tu normalidad.",
+        "type": "Garmin real",
+    },
+    "resting_hr_bpm": {
+        "label": "Resting HR",
+        "definition": "Frecuencia cardiaca en reposo. Suele ser mas util en tendencia que como valor aislado.",
+        "type": "Garmin real",
+    },
+    "body_battery_avg": {
+        "label": "Body Battery promedio",
+        "definition": "Score propietario de Garmin sobre reservas energeticas. Util como apoyo, no como verdad fisiologica absoluta.",
+        "type": "Garmin real",
+    },
+    "readiness_score": {
+        "label": "Training Readiness",
+        "definition": "Score Garmin de preparacion para entrenar. En tu cuenta actual no esta disponible por esta via.",
+        "type": "No disponible hoy",
+    },
+    "training_status": {
+        "label": "Training Status",
+        "definition": "Estado global de entrenamiento segun Garmin. En tu cuenta actual no esta disponible por esta via.",
+        "type": "No disponible hoy",
+    },
+    "total_training_load": {
+        "label": "Carga diaria",
+        "definition": "Suma diaria estimada de carga derivada de tus actividades registradas.",
+        "type": "Derivada local",
+    },
+    "acute_chronic_ratio": {
+        "label": "Ratio agudo/cronica",
+        "definition": "Relacion entre carga reciente y carga de fondo para vigilar subidas demasiado rapidas.",
+        "type": "Derivada local",
+    },
+    "sleep_consistency_score": {
+        "label": "Consistencia del sueno",
+        "definition": "Metrica derivada local sobre estabilidad de tus horas de sueno recientes.",
+        "type": "Derivada local",
+    },
+}
+
 
 @st.cache_data
-def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str]:
+def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     analytics = AnalyticsService()
     coverage = CoverageAnalyticsService(analytics.db)
+    performance = PerformanceAnalyticsService(analytics.db, analytics)
     insights = InsightService(analytics=analytics)
     dataset = analytics.build_dashboard_dataset()
     insight_frame = analytics.db.read_sql("SELECT * FROM insights_history ORDER BY insight_date DESC")
     if insight_frame.empty:
         insight_frame = insights.generate_insights()
     coverage_frame = coverage.build_coverage_report()
-    return dataset, insight_frame, coverage_frame, insights.build_daily_summary_text(), insights.build_weekly_summary_text()
+    best_days, worst_days = performance.build_day_rankings()
+    weekly_comparison = performance.build_weekly_comparison()
+    fatigue_alerts = performance.build_fatigue_alerts()
+    return (
+        dataset,
+        insight_frame,
+        coverage_frame,
+        insights.build_daily_summary_text(),
+        insights.build_weekly_summary_text(),
+        best_days,
+        worst_days,
+        weekly_comparison,
+        fatigue_alerts,
+    )
 
 
 def render_metrics_row(dataset: pd.DataFrame) -> None:
     latest = dataset.sort_values("metric_date").iloc[-1]
-    cols = st.columns(6)
+    cols = st.columns(5)
     cols[0].metric("Sueno (h)", f"{latest.get('duration_hours', 0):.1f}")
     cols[1].metric("HRV", f"{latest.get('overnight_avg', 0):.1f}")
     cols[2].metric("Resting HR", f"{latest.get('resting_hr_bpm', 0):.1f}")
-    cols[3].metric("Readiness", f"{latest.get('readiness_score', 0):.0f}")
-    cols[4].metric("Pasos", f"{int(latest.get('steps', 0))}")
-    cols[5].metric("Carga", f"{latest.get('total_training_load', 0):.0f}")
+    cols[3].metric("Pasos", f"{int(latest.get('steps', 0))}")
+    cols[4].metric("Carga", f"{latest.get('total_training_load', 0):.0f}")
 
 
 def plot_available_series(dataset: pd.DataFrame, x_column: str, y_columns: list[str], chart_type: str = "line") -> None:
@@ -64,11 +145,58 @@ def ensure_columns(dataset: pd.DataFrame, columns_with_defaults: dict[str, float
     return current
 
 
+def is_metric_available(coverage_frame: pd.DataFrame, dataset_name: str) -> bool:
+    match = coverage_frame[coverage_frame["dataset"] == dataset_name]
+    if match.empty:
+        return False
+    return str(match.iloc[0]["status"]) != "missing"
+
+
+def render_glossary(coverage_frame: pd.DataFrame) -> None:
+    st.subheader("Glosario y criterio de interpretacion")
+    st.write("Aqui diferenciamos entre datos Garmin reales, metricas derivadas locales y senales no disponibles hoy en tu cuenta.")
+    rows = []
+    for metric_key, metadata in METRIC_GLOSSARY.items():
+        availability = metadata["type"]
+        if metric_key == "readiness_score" and is_metric_available(coverage_frame, "training_readiness"):
+            availability = "Garmin real"
+        if metric_key == "training_status" and is_metric_available(coverage_frame, "training_status"):
+            availability = "Garmin real"
+        rows.append(
+            {
+                "metrica": metadata["label"],
+                "tipo": availability,
+                "significado": metadata["definition"],
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+
+def render_metric_availability_notice(coverage_frame: pd.DataFrame) -> None:
+    missing = coverage_frame[coverage_frame["status"] == "missing"]["dataset"].tolist()
+    if missing:
+        st.warning(
+            "Estas senales no estan disponibles actualmente en tu cuenta o en esta ruta de ingesta: "
+            + ", ".join(missing)
+            + ". No deberian interpretarse como cero fisiologico."
+        )
+
+
 def main() -> None:
     st.title("Garmin Insights")
     st.caption("Plataforma local para recuperar, analizar y visualizar senales de entrenamiento y recuperacion.")
 
-    dataset, insight_frame, coverage_frame, daily_summary_text, weekly_summary_text = load_dashboard_data()
+    (
+        dataset,
+        insight_frame,
+        coverage_frame,
+        daily_summary_text,
+        weekly_summary_text,
+        best_days,
+        worst_days,
+        weekly_comparison,
+        fatigue_alerts,
+    ) = load_dashboard_data()
     if dataset.empty:
         st.warning("No hay datos. Ejecuta primero los scripts de inicializacion e ingesta.")
         return
@@ -103,6 +231,7 @@ def main() -> None:
     )
 
     render_metrics_row(filtered)
+    render_metric_availability_notice(coverage_frame)
     st.info(daily_summary_text)
     st.caption(weekly_summary_text)
 
@@ -112,6 +241,8 @@ def main() -> None:
             "Sueno y recuperacion",
             "Entrenamiento y carga",
             "Tendencias",
+            "Rendimiento y comparativos",
+            "Glosario y semantica",
             "Peso y composicion corporal",
             "Cobertura de datos",
             "Insights automaticos",
@@ -120,25 +251,46 @@ def main() -> None:
 
     with tabs[0]:
         st.subheader("Vista general")
-        st.write("Interpretacion: revisa la relacion entre sueno, HRV, readiness y carga para ver equilibrio o fatiga.")
-        plot_available_series(filtered, "metric_date", ["duration_hours", "overnight_avg", "resting_hr_bpm", "readiness_score"])
+        st.write("Interpretacion: esta vista resume las senales principales realmente disponibles hoy. Evitamos mezclar escalas incompatibles en un mismo grafico.")
+        plot_available_series(filtered, "metric_date", ["duration_hours"])
+        plot_available_series(filtered, "metric_date", ["overnight_avg", "resting_hr_bpm"])
         plot_available_series(filtered, "metric_date", ["total_training_load"], chart_type="bar")
 
     with tabs[1]:
         st.subheader("Sueno y recuperacion")
-        st.write("Interpretacion: caidas de HRV junto con subida de resting HR y poco sueno suelen sugerir recuperacion incompleta.")
+        st.write("Interpretacion: aqui si tiene sentido comparar sueno con HRV y resting HR, pero en paneles separados. Buscamos recuperacion incompleta, no coincidencias visuales artificiales.")
         plot_available_series(filtered, "metric_date", ["duration_hours", "sleep_hours_7d", "sleep_hours_28d"])
-        plot_available_series(filtered, "metric_date", ["overnight_avg", "hrv_7d", "resting_hr_bpm", "readiness_score", "body_battery_avg"])
+        plot_available_series(filtered, "metric_date", ["overnight_avg", "hrv_7d", "hrv_28d"])
+        plot_available_series(filtered, "metric_date", ["resting_hr_bpm", "resting_hr_7d", "resting_hr_28d"])
+        plot_available_series(filtered, "metric_date", ["body_battery_avg"])
+
+        scatter_frame = filtered.copy()
+        scatter_frame = scatter_frame.dropna(subset=["duration_hours", "overnight_avg"])
+        if not scatter_frame.empty:
+            st.write("Relacion exploratoria sueno vs HRV: util para detectar si peores noches coinciden con menor HRV respecto a tu propia base.")
+            st.plotly_chart(
+                px.scatter(scatter_frame, x="duration_hours", y="overnight_avg", color="metric_date"),
+                use_container_width=True,
+            )
 
     with tabs[2]:
         st.subheader("Entrenamiento y carga")
-        st.write("Interpretacion: una subida rapida de la carga aguda frente a la cronica puede aumentar riesgo de fatiga.")
+        st.write("Interpretacion: aqui analizamos carga y volumen. No mezclamos esta vista con sueno o HRV salvo en correlaciones concretas.")
         plot_available_series(filtered, "metric_date", ["activity_count", "total_duration_minutes", "total_training_load"], chart_type="bar")
-        plot_available_series(filtered, "metric_date", ["acute_chronic_ratio", "load_readiness_ratio"])
+        plot_available_series(filtered, "metric_date", ["acute_chronic_ratio"])
+
+        load_recovery = filtered.copy()
+        load_recovery = load_recovery.dropna(subset=["total_training_load", "overnight_avg"])
+        if not load_recovery.empty:
+            st.write("Relacion exploratoria carga diaria vs HRV: sirve para ver si cargas mas altas coinciden con descensos de recuperacion.")
+            st.plotly_chart(
+                px.scatter(load_recovery, x="total_training_load", y="overnight_avg", color="metric_date"),
+                use_container_width=True,
+            )
 
     with tabs[3]:
         st.subheader("Tendencias semanales y mensuales")
-        st.write("Interpretacion: compara tus bases de 7 y 28 dias para detectar mejora, estabilidad o deterioro.")
+        st.write("Interpretacion: aqui comparamos promedios agregados por semana. Esta vista tiene mas sentido para tendencia que para detalle fisiologico fino.")
         trend = filtered.copy()
         trend["week"] = trend["metric_date"].dt.to_period("W").astype(str)
         weekly = trend.groupby("week", as_index=False).agg(
@@ -146,17 +298,55 @@ def main() -> None:
             avg_hrv=("overnight_avg", "mean"),
             avg_rhr=("resting_hr_bpm", "mean"),
             total_load=("total_training_load", "sum"),
-            avg_readiness=("readiness_score", "mean"),
         )
-        plot_available_series(weekly, "week", ["avg_sleep", "avg_hrv", "avg_rhr", "avg_readiness"])
+        plot_available_series(weekly, "week", ["avg_sleep", "avg_hrv", "avg_rhr"])
         plot_available_series(weekly, "week", ["total_load"], chart_type="bar")
 
     with tabs[4]:
-        st.subheader("Peso y composicion corporal")
-        st.write("Interpretacion: cambios de peso deben leerse junto con carga, hidratacion y contexto de entrenamiento.")
-        plot_available_series(filtered, "metric_date", ["weight_kg", "body_fat_pct", "muscle_mass_kg", "body_water_pct"])
+        st.subheader("Rendimiento y comparativos")
+        st.write("Interpretacion: esta vista prioriza comparaciones accionables. Muestra que mejoro o empeoro esta semana y cuales fueron tus dias fisiologicamente mas fuertes o mas comprometidos.")
+        if not weekly_comparison.empty:
+            st.write("Comparacion semana reciente vs semana previa")
+            st.dataframe(weekly_comparison, use_container_width=True)
+
+        col_best, col_worst = st.columns(2)
+        with col_best:
+            st.write("Mejores dias recientes")
+            if best_days.empty:
+                st.info("No hay datos suficientes para ranking de mejores dias.")
+            else:
+                st.dataframe(best_days, use_container_width=True)
+        with col_worst:
+            st.write("Dias con peor recuperacion potencial")
+            if worst_days.empty:
+                st.info("No hay datos suficientes para ranking de peores dias.")
+            else:
+                st.dataframe(worst_days, use_container_width=True)
+
+        st.write("Alertas compuestas de fatiga")
+        if fatigue_alerts.empty:
+            st.info("No hay alertas compuestas de fatiga en el periodo seleccionado.")
+        else:
+            fatigue_view = fatigue_alerts.copy()
+            fatigue_view["metric_date"] = pd.to_datetime(fatigue_view["metric_date"])
+            fatigue_view = fatigue_view[
+                (fatigue_view["metric_date"].dt.date >= start_date) & (fatigue_view["metric_date"].dt.date <= end_date)
+            ]
+            st.dataframe(fatigue_view, use_container_width=True)
 
     with tabs[5]:
+        render_glossary(coverage_frame)
+
+    with tabs[6]:
+        st.subheader("Peso y composicion corporal")
+        st.write("Interpretacion: esta vista solo tiene sentido si realmente existe peso o composicion corporal en tu cuenta.")
+        if is_metric_available(coverage_frame, "weight_body_composition"):
+            plot_available_series(filtered, "metric_date", ["weight_kg"])
+            plot_available_series(filtered, "metric_date", ["body_fat_pct", "muscle_mass_kg", "body_water_pct"])
+        else:
+            st.info("No hay datos reales de peso o composicion corporal disponibles actualmente.")
+
+    with tabs[7]:
         st.subheader("Cobertura y calidad")
         st.write("Interpretacion: esta vista te dice con que datos reales contamos hoy, que tan completos estan y que falta para enriquecer el analisis.")
         if coverage_frame.empty:
@@ -181,7 +371,7 @@ def main() -> None:
                 use_container_width=True,
             )
 
-    with tabs[6]:
+    with tabs[8]:
         st.subheader("Insights automaticos")
         st.write("Cada insight incluye nombre, severidad, explicacion y recomendacion breve.")
         if insight_frame.empty:
