@@ -360,6 +360,12 @@ Para levantar la API local:
 python .\scripts\run_api.py
 ```
 
+La API sirve tambien una PWA movil instalable en:
+
+```text
+http://127.0.0.1:8000/
+```
+
 ## 12. Proximos Pasos Priorizados
 
 1. Conectar Garmin real o export oficial.

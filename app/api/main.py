@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.analytics import AnalyticsService, CoverageAnalyticsService, ManualCheckinAnalyticsService, PerformanceAnalyticsService
 from app.api.schemas import HealthResponse, ManualCheckinRequest, MessageResponse, TableResponse
@@ -12,6 +15,9 @@ from app.storage import DatabaseManager
 
 
 app = FastAPI(title="Garmin Insights API", version="0.1.0")
+PWA_DIR = Path(__file__).resolve().parents[1] / "pwa"
+
+app.mount("/static", StaticFiles(directory=PWA_DIR), name="static")
 
 
 def _to_records(frame: pd.DataFrame) -> list[dict]:
@@ -22,6 +28,26 @@ def _to_records(frame: pd.DataFrame) -> list[dict]:
         if pd.api.types.is_datetime64_any_dtype(current[column]):
             current[column] = current[column].astype(str)
     return current.where(pd.notnull(current), None).to_dict(orient="records")
+
+
+@app.get("/", include_in_schema=False)
+def serve_pwa() -> FileResponse:
+    return FileResponse(PWA_DIR / "index.html")
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def serve_manifest() -> FileResponse:
+    return FileResponse(PWA_DIR / "manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def serve_service_worker() -> FileResponse:
+    return FileResponse(PWA_DIR / "sw.js", media_type="application/javascript")
+
+
+@app.get("/icon.svg", include_in_schema=False)
+def serve_icon() -> FileResponse:
+    return FileResponse(PWA_DIR / "icon.svg", media_type="image/svg+xml")
 
 
 @app.get("/health", response_model=HealthResponse)

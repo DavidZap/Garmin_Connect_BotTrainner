@@ -1,0 +1,17 @@
+{
+  "name": "Garmin Insights Mobile",
+  "short_name": "Garmin Insights",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f0e8",
+  "theme_color": "#0f3b2e",
+  "description": "PWA movil para revisar recuperacion, carga, insights y check-ins de Garmin Insights.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f3b2e" />
+    <title>Garmin Insights Mobile</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Garmin Insights</p>
+          <h1>Tu recuperacion en el bolsillo</h1>
+          <p class="subtitle">
+            Vista movil instalable para revisar recuperacion, carga, mejores dias, alertas y check-ins manuales.
+          </p>
+        </div>
+        <button id="install-button" class="secondary-button hidden">Instalar app</button>
+      </header>
+
+      <main class="content">
+        <section class="card metrics-card">
+          <div class="section-title">
+            <h2>Hoy</h2>
+            <p>Resumen rapido con las senales principales disponibles.</p>
+          </div>
+          <div id="top-metrics" class="metric-grid"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-title">
+            <h2>Lectura semanal</h2>
+            <p>Interpretacion automatica basada en tus datos reales actuales.</p>
+          </div>
+          <div id="weekly-narrative" class="narrative-box">Cargando...</div>
+        </section>
+
+        <section class="card">
+          <div class="section-title">
+            <h2>Comparacion semanal</h2>
+            <p>Que subio, que bajo y que se mantuvo estable frente a la semana previa.</p>
+          </div>
+          <div id="weekly-comparison" class="list-table"></div>
+        </section>
+
+        <section class="card dual-card">
+          <div>
+            <div class="section-title">
+              <h2>Mejor dia</h2>
+              <p>Tu mejor perfil reciente de recuperacion relativa.</p>
+            </div>
+            <div id="best-day-narrative" class="narrative-box">Cargando...</div>
+            <div id="best-days" class="mini-list"></div>
+          </div>
+          <div>
+            <div class="section-title">
+              <h2>Peor dia</h2>
+              <p>Dia con peor recuperacion potencial reciente.</p>
+            </div>
+            <div id="worst-day-narrative" class="narrative-box">Cargando...</div>
+            <div id="worst-days" class="mini-list"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-title">
+            <h2>Alertas de fatiga</h2>
+            <p>Alertas compuestas cuando se alinean varias senales de sobrecarga.</p>
+          </div>
+          <div id="fatigue-alerts" class="alert-list"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-title">
+            <h2>Check-in manual</h2>
+            <p>Agrega contexto subjetivo para complementar lo que no capturan los sensores.</p>
+          </div>
+          <form id="manual-checkin-form" class="checkin-form">
+            <label>
+              Fecha
+              <input type="date" name="checkin_date" required />
+            </label>
+            <div class="grid-2">
+              <label>Energia
+                <input type="number" name="perceived_energy" min="1" max="5" />
+              </label>
+              <label>Estres
+                <input type="number" name="work_stress" min="1" max="5" />
+              </label>
+              <label>Dolor muscular
+                <input type="number" name="muscle_soreness" min="1" max="5" />
+              </label>
+              <label>Hidratacion
+                <input type="number" name="hydration" min="1" max="5" />
+              </label>
+              <label>Alimentacion
+                <input type="number" name="nutrition_quality" min="1" max="5" />
+              </label>
+              <label>Estado emocional
+                <input type="number" name="mood" min="1" max="5" />
+              </label>
+              <label>Carga fuerza
+                <input type="number" name="strength_training_load" min="0" max="5" />
+              </label>
+              <label>Fase ciclo
+                <input type="text" name="menstrual_cycle_phase" />
+              </label>
+            </div>
+            <label>
+              Notas
+              <textarea name="notes" rows="3"></textarea>
+            </label>
+            <button type="submit" class="primary-button">Guardar check-in</button>
+            <p id="form-status" class="form-status"></p>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+  </html>

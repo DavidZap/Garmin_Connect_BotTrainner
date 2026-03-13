@@ -22,6 +22,14 @@ http://127.0.0.1:8000
 http://127.0.0.1:8000/docs
 ```
 
+## PWA movil
+
+La raiz de la API ahora sirve una PWA instalable:
+
+```text
+http://127.0.0.1:8000/
+```
+
 ## Endpoints principales
 
 - `GET /health`
