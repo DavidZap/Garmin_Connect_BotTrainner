@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: garmin-insights
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_api.py
+    envVars:
+      - key: APP_HOST
+        value: 0.0.0.0
+      - key: APP_PORT
+        value: 8000
+      - key: GARMIN_SOURCE
+        value: node

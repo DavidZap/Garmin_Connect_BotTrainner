@@ -366,6 +366,23 @@ La API sirve tambien una PWA movil instalable en:
 http://127.0.0.1:8000/
 ```
 
+Para exponerla en tu red local y probarla desde Android:
+
+```dotenv
+APP_HOST=0.0.0.0
+APP_PORT=8000
+PUBLIC_BASE_URL=http://TU_IP_LOCAL:8000
+```
+
+## Credenciales Garmin
+
+Recomendacion actual:
+
+- usar `.env` en local
+- usar secretos del proveedor cuando despliegues
+- no pedir usuario y password en cada apertura de la app
+- a futuro, usar onboarding una sola vez y guardar el secreto en backend, no en la PWA
+
 ## 12. Proximos Pasos Priorizados
 
 1. Conectar Garmin real o export oficial.

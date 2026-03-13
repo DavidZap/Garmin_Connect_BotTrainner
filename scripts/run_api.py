@@ -5,6 +5,8 @@ from pathlib import Path
 
 import uvicorn
 
+from app.config import get_settings
+
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -12,7 +14,8 @@ if str(ROOT_DIR) not in sys.path:
 
 
 def main() -> None:
-    uvicorn.run("app.api.main:app", host="127.0.0.1", port=8000, reload=False)
+    settings = get_settings()
+    uvicorn.run("app.api.main:app", host=settings.app_host, port=settings.app_port, reload=False)
 
 
 if __name__ == "__main__":
