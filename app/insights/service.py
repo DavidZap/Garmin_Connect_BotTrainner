@@ -5,7 +5,7 @@ import uuid
 
 import pandas as pd
 
-from app.analytics import AnalyticsService
+from app.analytics import AnalyticsService, CoverageAnalyticsService
 from app.insights.rules import INSIGHT_RULES
 from app.storage import DatabaseManager
 from app.utils import get_logger
@@ -127,11 +127,12 @@ class InsightService:
         if dataset.empty:
             return "No hay datos suficientes para generar un resumen diario."
         latest = dataset.sort_values("metric_date").iloc[-1]
+        coverage_summary = CoverageAnalyticsService(self.db).build_availability_summary()
         return (
             f"Resumen diario {latest['metric_date'].date()}: "
             f"sueno {latest.get('duration_hours', 0):.1f}h, HRV {latest.get('overnight_avg', 0):.1f}, "
             f"RHR {latest.get('resting_hr_bpm', 0):.1f}, readiness {latest.get('readiness_score', 0):.0f}, "
-            f"carga {latest.get('total_training_load', 0):.0f}."
+            f"carga {latest.get('total_training_load', 0):.0f}. {coverage_summary}"
         )
 
     def build_weekly_summary_text(self) -> str:
@@ -142,11 +143,12 @@ class InsightService:
         previous = dataset.sort_values("metric_date").tail(14).head(7)
         if previous.empty:
             previous = recent
+        coverage_summary = CoverageAnalyticsService(self.db).build_availability_summary()
         return (
             f"Semana reciente: sueno promedio {recent['duration_hours'].mean():.1f}h vs {previous['duration_hours'].mean():.1f}h; "
             f"HRV {recent['overnight_avg'].mean():.1f} vs {previous['overnight_avg'].mean():.1f}; "
             f"readiness {recent['readiness_score'].mean():.1f} vs {previous['readiness_score'].mean():.1f}; "
-            f"carga total {recent['total_training_load'].sum():.0f}."
+            f"carga total {recent['total_training_load'].sum():.0f}. {coverage_summary}"
         )
 
     def _build_insight(
@@ -179,4 +181,3 @@ class InsightService:
         if hasattr(value, "isoformat"):
             return value.isoformat()
         return value
-

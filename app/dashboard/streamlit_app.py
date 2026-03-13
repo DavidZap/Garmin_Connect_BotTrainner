@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.analytics import AnalyticsService
+from app.analytics import AnalyticsService, CoverageAnalyticsService
 from app.insights import InsightService
 
 
@@ -12,14 +12,16 @@ st.set_page_config(page_title="Garmin Insights", layout="wide")
 
 
 @st.cache_data
-def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_dashboard_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, str]:
     analytics = AnalyticsService()
+    coverage = CoverageAnalyticsService(analytics.db)
     insights = InsightService(analytics=analytics)
     dataset = analytics.build_dashboard_dataset()
     insight_frame = analytics.db.read_sql("SELECT * FROM insights_history ORDER BY insight_date DESC")
     if insight_frame.empty:
         insight_frame = insights.generate_insights()
-    return dataset, insight_frame
+    coverage_frame = coverage.build_coverage_report()
+    return dataset, insight_frame, coverage_frame, insights.build_daily_summary_text(), insights.build_weekly_summary_text()
 
 
 def render_metrics_row(dataset: pd.DataFrame) -> None:
@@ -66,7 +68,7 @@ def main() -> None:
     st.title("Garmin Insights")
     st.caption("Plataforma local para recuperar, analizar y visualizar senales de entrenamiento y recuperacion.")
 
-    dataset, insight_frame = load_dashboard_data()
+    dataset, insight_frame, coverage_frame, daily_summary_text, weekly_summary_text = load_dashboard_data()
     if dataset.empty:
         st.warning("No hay datos. Ejecuta primero los scripts de inicializacion e ingesta.")
         return
@@ -101,6 +103,8 @@ def main() -> None:
     )
 
     render_metrics_row(filtered)
+    st.info(daily_summary_text)
+    st.caption(weekly_summary_text)
 
     tabs = st.tabs(
         [
@@ -109,6 +113,7 @@ def main() -> None:
             "Entrenamiento y carga",
             "Tendencias",
             "Peso y composicion corporal",
+            "Cobertura de datos",
             "Insights automaticos",
         ]
     )
@@ -152,6 +157,31 @@ def main() -> None:
         plot_available_series(filtered, "metric_date", ["weight_kg", "body_fat_pct", "muscle_mass_kg", "body_water_pct"])
 
     with tabs[5]:
+        st.subheader("Cobertura y calidad")
+        st.write("Interpretacion: esta vista te dice con que datos reales contamos hoy, que tan completos estan y que falta para enriquecer el analisis.")
+        if coverage_frame.empty:
+            st.info("No hay reporte de cobertura disponible.")
+        else:
+            status_counts = coverage_frame.groupby("status", as_index=False).agg(total=("dataset", "count"))
+            st.plotly_chart(px.bar(status_counts, x="status", y="total", color="status"), use_container_width=True)
+            st.dataframe(
+                coverage_frame[
+                    [
+                        "dataset",
+                        "status",
+                        "total_rows",
+                        "first_date",
+                        "last_date",
+                        "populated_days",
+                        "coverage_pct",
+                        "available_columns",
+                        "missing_columns",
+                    ]
+                ],
+                use_container_width=True,
+            )
+
+    with tabs[6]:
         st.subheader("Insights automaticos")
         st.write("Cada insight incluye nombre, severidad, explicacion y recomendacion breve.")
         if insight_frame.empty:
