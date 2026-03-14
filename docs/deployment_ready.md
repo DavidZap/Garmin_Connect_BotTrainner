@@ -9,6 +9,7 @@ Esta fase deja el proyecto listo para desplegar API + PWA fuera de tu PC.
 - `Dockerfile`
 - `.dockerignore`
 - `render.yaml`
+- `runtime.txt` para fijar Python 3.11
 
 ## Arranque local con acceso desde otros dispositivos de tu red
 
