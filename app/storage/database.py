@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 class DatabaseManager:
     def __init__(self, database_url: str | None = None) -> None:
         settings = get_settings()
-        self.database_url = database_url or settings.database_url
+        self.database_url = self._normalize_database_url(database_url or settings.database_url)
         self.engine: Engine = create_engine(self.database_url, future=True)
 
     def initialize_database(self) -> None:
@@ -68,3 +68,11 @@ class DatabaseManager:
         frame.to_csv(export_path, index=False)
         logger.info("Exported dataset to %s", export_path)
         return export_path
+
+    @staticmethod
+    def _normalize_database_url(database_url: str) -> str:
+        if database_url.startswith("postgresql://"):
+            return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        if database_url.startswith("postgres://"):
+            return database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        return database_url
